@@ -1,0 +1,5 @@
+{
+  "min_r2": 0.85,
+  "max_mse": 3.0,
+  "notes": "Current model scores R2=0.956, MSE=0.726 on the fixed random_state=42 split. These thresholds leave headroom for legitimate variation while still catching a real regression (e.g. a bad feature change or a worse model choice)."
+}
