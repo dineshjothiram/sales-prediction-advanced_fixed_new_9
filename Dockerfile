@@ -48,14 +48,23 @@ RUN apt-get update \
 # ensurepip seed wheels it bundles for creating new venvs. The running
 # app never uses the system Python's site-packages - it runs exclusively
 # via /opt/venv/bin/python (see PATH above) - so this is pure unused
-# attack surface. A Trivy scan flagged 4 HIGH CVEs living entirely in
-# this unused system copy (old vendored jaraco.context/wheel inside
-# setuptools, plus ensurepip's frozen setuptools/wheel/msgpack wheels)
-# even after the venv's own pip/setuptools/wheel were upgraded - those
-# fixes never touch this separate, dormant copy. `|| true` because the
-# exact file layout can shift between Python patch releases; this is a
-# best-effort hardening step, not something that should ever block a
-# build if a path has moved.
+# attack surface. A Trivy scan flagged HIGH CVEs living entirely in this
+# unused system copy across several locations:
+#   - stale vendored jaraco.context/wheel inside the system setuptools
+#   - /usr/local/lib/python3.11/ensurepip (upstream CPython's bundled
+#     seed wheel location)
+#   - /usr/share/python-wheels/*.whl - Debian patches ensurepip to source
+#     its seed wheels from here instead, a separate location upstream
+#     CPython doesn't use. Trivy can read package metadata directly out
+#     of a .whl file without it being installed, which is how an old
+#     setuptools and pip's vendored msgpack kept surviving even after
+#     ensurepip itself was removed. Confirmed by directly inspecting a
+#     Debian-family filesystem for every .whl file present.
+# None of this is touched by upgrading the venv's own pip/setuptools/
+# wheel, since it's a second, entirely separate copy.
+# `|| true` because the exact file layout can shift between Python patch
+# releases; this is a best-effort hardening step, not something that
+# should ever block a build if a path has moved.
 RUN rm -rf \
       /usr/local/lib/python3.11/ensurepip \
       /usr/local/lib/python3.11/site-packages/pip \
@@ -66,6 +75,7 @@ RUN rm -rf \
       /usr/local/lib/python3.11/site-packages/wheel-*.dist-info \
       /usr/local/lib/python3.11/site-packages/pkg_resources \
       /usr/local/bin/pip3 /usr/local/bin/pip3.11 \
+      /usr/share/python-wheels \
     || true
 
 COPY --from=builder /opt/venv /opt/venv
